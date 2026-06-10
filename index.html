@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cloud Scoring Matrix</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f9fafb; color: #111; padding: 20px; }
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f3f4f6;
+    --color-text-primary: #111827;
+    --color-text-secondary: #6b7280;
+    --color-text-tertiary: #9ca3af;
+    --color-border-tertiary: #e5e7eb;
+    :root {
+      --color-background-primary: #ffffff;
+      --color-background-secondary: #f3f4f6;
+      --color-text-primary: #111827;
+      --color-text-secondary: #6b7280;
+      --color-text-tertiary: #9ca3af;
+      --color-border-tertiary: #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const lenses = [
+      { name: "Regions & Data Residency", weight: 13,
+        aws: { score: 4, notes: "All 3 regions confirmed. Bedrock inference profiles GA with defined SLAs." },
+        azure: { score: 3, notes: "All 3 regions confirmed. Azure Foundry Claude preview — geographic inference SLA not guaranteed." } },
+      { name: "Agreements & Compliance", weight: 12,
+        aws: { score: 4, notes: "EA in place. DPA available. OpenSearch covered under existing AWS DPA." },
+        azure: { score: 4, notes: "EA in place. DPA available. Elastic DPA separate but well established." } },
+      { name: "Compute", weight: 9,
+        aws: { score: 4, notes: "ECS Fargate. Better documented Node.js burst scaling. Datadog sidecar proven." },
+        azure: { score: 3, notes: "Container Apps. Less documented for Node.js burst. Datadog needs more setup." } },
+      { name: "Storage & Egress", weight: 7,
+        aws: { score: 3, notes: "S3 $0.023/GB. Glacier $0.004/GB. CloudFront $0.085/GB." },
+        azure: { score: 4, notes: "Blob $0.018/GB. Archive $0.002/GB. Azure CDN $0.081/GB. Marginally cheaper." } },
+      { name: "Cost", weight: 6,
+        aws: { score: 3, notes: "3-year prod ~$57k. Compute marginally cheaper. Enterprise discount TBC." },
+        azure: { score: 3, notes: "3-year prod ~$59k. Storage marginally cheaper. Enterprise discount TBC." } },
+      { name: "Long Term StarRez Support", weight: 12,
+        aws: { score: 2, notes: "StarRez platform team knows Azure. AWS handoff creates real skills gap post-October." },
+        azure: { score: 5, notes: "StarRez platform team already operates Azure. Familiar territory post-handoff." } },
+      { name: "Managed Services", weight: 7,
+        aws: { score: 4, notes: "RDS, Fargate, S3, SQS. Aurora Serverless v2 post-launch. Bedrock GA." },
+        azure: { score: 3, notes: "Azure DB, Container Apps, Blob, Service Bus. No Aurora equivalent. Foundry preview only." } },
+      { name: "Architecture Decisions", weight: 7,
+        aws: { score: 4, notes: "OpenSearch native, Zillow precedent. SQS graduation. NestJS community stronger." },
+        azure: { score: 3, notes: "Elasticsearch on Elastic Cloud, Apartments.com precedent. Service Bus graduation." } },
+      { name: "Tooling & DevOps", weight: 6,
+        aws: { score: 4, notes: "Terraform, GitHub Actions, Datadog all work. Larger NestJS/Next.js community." },
+        azure: { score: 3, notes: "Same tools work. Slightly smaller community for our specific stack." } },
+      { name: "AI Inference — model quality", weight: 6,
+        aws: { score: 3, notes: "Claude on Bedrock shortlisted. PENDING ADR 0014 spike — update after results." },
+        azure: { score: 3, notes: "GPT-4o on Azure OpenAI shortlisted. PENDING ADR 0014 spike — update after results." } },
+      { name: "AI Inference — platform maturity", weight: 7,
+        aws: { score: 5, notes: "Bedrock GA. Native IAM, VPC connection, synchronised with Anthropic. Full SLA." },
+        azure: { score: 3, notes: "If GPT-4o wins spike: Azure OpenAI GA, comparable to Bedrock. If Claude wins: Foundry preview, no SLA. Score reflects uncertainty." } },
+      { name: "Portability & Lock-in", weight: 5,
+        aws: { score: 3, notes: "Bedrock lock-in mitigated by Vercel AI SDK. Terraform rewrite 2-4 weeks." },
+        azure: { score: 4, notes: "Azure Foundry preview means less inference lock-in now. Elastic Cloud portable." } },
+      { name: "Team & Familiarity", weight: 3,
+        aws: { score: 3, notes: "ThoughtWorks 3 devs know AWS. StarRez 3 devs need ramp-up." },
+        azure: { score: 3, notes: "StarRez 3 devs know Azure. ThoughtWorks 3 devs need ramp-up. Tie at build time." } },
+    ];
+
+    const totalWeight = lenses.reduce((s, l) => s + l.weight, 0);
+
+    function ScoringMatrix() {
+      const [scores, setScores] = React.useState(() =>
+        Object.fromEntries(lenses.map(l => [l.name, { aws: l.aws.score, azure: l.azure.score }]))
+      );
+
+      const set = (name, provider, val) =>
+        setScores(p => ({ ...p, [name]: { ...p[name], [provider]: val } }));
+
+      const awsW = lenses.reduce((s, l) => s + scores[l.name].aws * l.weight, 0) / totalWeight;
+      const azureW = lenses.reduce((s, l) => s + scores[l.name].azure * l.weight, 0) / totalWeight;
+      const winner = awsW > azureW ? "AWS" : azureW > awsW ? "Azure" : "Tie";
+      const margin = Math.abs(awsW - azureW).toFixed(2);
+
+      const pill = s => {
+        if (s >= 4.5) return { bg: "#dcfce7", text: "#15803d" };
+        if (s >= 3.5) return { bg: "#dbeafe", text: "#1d4ed8" };
+        if (s >= 2.5) return { bg: "#fef9c3", text: "#854d0e" };
+        return { bg: "#fee2e2", text: "#991b1b" };
+      };
+
+      return (
+        <div style={{ padding: "12px 0", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: 13 }}>
+          <h2 style={{ marginBottom: 14, fontSize: 18, fontWeight: 800, color: "#111827" }}>Cloud Platform Scoring Matrix</h2>
+
+          {/* Summary cards */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+            {[
+              { label: "AWS weighted score", val: `${awsW.toFixed(2)}/5`, sub: `${((awsW/5)*100).toFixed(1)}%`, bg: "#FFF3D6", text: "#B45309" },
+              { label: "Azure weighted score", val: `${azureW.toFixed(2)}/5`, sub: `${((azureW/5)*100).toFixed(1)}%`, bg: "#DBEAFE", text: "#1D4ED8" },
+              { label: "Recommendation", val: winner, sub: `margin ${margin} pts`, bg: winner === "AWS" ? "#FFF3D6" : winner === "Azure" ? "#DBEAFE" : "#f3f4f6", text: winner === "AWS" ? "#B45309" : "#1D4ED8" },
+              { label: "Total weight", val: `${totalWeight}%`, sub: "13 lenses", bg: "#f3f4f6", text: "#111827" },
+            ].map(c => (
+              <div key={c.label} style={{ background: c.bg, borderRadius: 8, padding: "12px 16px", flex: 1, minWidth: 110 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: c.text, marginBottom: 4 }}>{c.label}</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: c.text }}>{c.val}</div>
+                <div style={{ fontSize: 12, color: c.text, opacity: 0.8 }}>{c.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Spike banner */}
+          <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "#92400e" }}>
+            <strong>⚠️ ADR 0014 spike in progress.</strong> AI Inference — model quality scores are equal placeholders. Update both after spike results.
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+              <thead>
+                <tr style={{ background: "#111827", color: "#fff" }}>
+                  {["#", "Lens", "Weight", "AWS", "Notes", "Azure", "Notes"].map(h => (
+                    <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {lenses.map((l, i) => {
+                  const aws = scores[l.name].aws;
+                  const azure = scores[l.name].azure;
+                  const pending = l.name === "AI Inference — model quality";
+                  return (
+                    <tr key={l.name} style={{
+                      borderBottom: "1px solid #e5e7eb",
+                      background: pending ? "#fffbeb" : i % 2 === 0 ? "#ffffff" : "#f9fafb"
+                    }}>
+                      <td style={{ padding: "8px 10px", color: "#9ca3af", fontWeight: 700, fontSize: 11 }}>{i + 1}</td>
+                      <td style={{ padding: "8px 10px", fontWeight: 600, color: "#111827", minWidth: 180 }}>
+                        {l.name}
+                        {pending && <span style={{ marginLeft: 6, fontSize: 10, background: "#fcd34d", color: "#92400e", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>SPIKE</span>}
+                      </td>
+                      <td style={{ padding: "8px 10px", fontWeight: 700, color: "#111827", whiteSpace: "nowrap" }}>{l.weight}%</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ padding: "2px 8px", borderRadius: 10, background: pill(aws).bg, color: pill(aws).text, fontWeight: 700, fontSize: 12, minWidth: 24, textAlign: "center" }}>{aws}</span>
+                          <input type="range" min="1" max="5" step="1" value={aws}
+                            onChange={e => set(l.name, "aws", +e.target.value)}
+                            style={{ width: 56 }}/>
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px 10px", fontSize: 12, color: "#6b7280", maxWidth: 200 }}>{l.aws.notes}</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ padding: "2px 8px", borderRadius: 10, background: pill(azure).bg, color: pill(azure).text, fontWeight: 700, fontSize: 12, minWidth: 24, textAlign: "center" }}>{azure}</span>
+                          <input type="range" min="1" max="5" step="1" value={azure}
+                            onChange={e => set(l.name, "azure", +e.target.value)}
+                            style={{ width: 56 }}/>
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px 10px", fontSize: 12, color: "#6b7280", maxWidth: 200 }}>{l.azure.notes}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: "#111827", color: "#fff" }}>
+                  <td colSpan={2} style={{ padding: "10px", fontWeight: 700, fontSize: 13 }}>Weighted total</td>
+                  <td style={{ padding: "10px", fontWeight: 700 }}>{totalWeight}%</td>
+                  <td colSpan={2} style={{ padding: "10px" }}>
+                    <span style={{ padding: "3px 10px", borderRadius: 10, background: "#FFF3D6", color: "#B45309", fontWeight: 800, fontSize: 13 }}>
+                      AWS {awsW.toFixed(2)}/5 ({((awsW/5)*100).toFixed(1)}%)
+                    </span>
+                  </td>
+                  <td colSpan={2} style={{ padding: "10px" }}>
+                    <span style={{ padding: "3px 10px", borderRadius: 10, background: "#DBEAFE", color: "#1D4ED8", fontWeight: 800, fontSize: 13 }}>
+                      Azure {azureW.toFixed(2)}/5 ({((azureW/5)*100).toFixed(1)}%)
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 10 }}>
+            Weights sum to {totalWeight}%. Drag sliders to adjust any score — recommendation updates live. Update AI Inference model quality scores after ADR 0014 spike.
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<ScoringMatrix />);
+  </script>
+</body>
+</html>
