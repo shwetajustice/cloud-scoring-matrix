@@ -46,9 +46,9 @@
       { name: "Cost", weight: 6,
         aws: { score: 3, notes: "3-year prod ~$57k. Compute marginally cheaper. Enterprise discount TBC." },
         azure: { score: 3, notes: "3-year prod ~$59k. Storage marginally cheaper. Enterprise discount TBC." } },
-      { name: "Long Term StarRez Support", weight: 12,
-        aws: { score: 2, notes: "StarRez platform team knows Azure. AWS handoff creates real skills gap post-October." },
-        azure: { score: 5, notes: "StarRez platform team already operates Azure. Familiar territory post-handoff." } },
+      { name: "Long Term Client Support", weight: 12,
+        aws: { score: 2, notes: "Client platform team knows Azure. AWS handoff creates real skills gap post-October." },
+        azure: { score: 5, notes: "Client platform team already operates Azure. Familiar territory post-handoff." } },
       { name: "Managed Services", weight: 7,
         aws: { score: 4, notes: "RDS, Fargate, S3, SQS. Aurora Serverless v2 post-launch. Bedrock GA." },
         azure: { score: 3, notes: "Azure DB, Container Apps, Blob, Service Bus. No Aurora equivalent. Foundry preview only." } },
@@ -68,8 +68,8 @@
         aws: { score: 3, notes: "Bedrock lock-in mitigated by Vercel AI SDK. Terraform rewrite 2-4 weeks." },
         azure: { score: 4, notes: "Azure Foundry preview means less inference lock-in now. Elastic Cloud portable." } },
       { name: "Team & Familiarity", weight: 3,
-        aws: { score: 3, notes: "ThoughtWorks 3 devs know AWS. StarRez 3 devs need ramp-up." },
-        azure: { score: 3, notes: "StarRez 3 devs know Azure. ThoughtWorks 3 devs need ramp-up. Tie at build time." } },
+        aws: { score: 3, notes: "ThoughtWorks 3 devs know AWS. Client 3 devs need ramp-up." },
+        azure: { score: 3, notes: "Client 3 devs know Azure. ThoughtWorks 3 devs need ramp-up. Tie at build time." } },
     ];
 
     const totalWeight = lenses.reduce((s, l) => s + l.weight, 0);
