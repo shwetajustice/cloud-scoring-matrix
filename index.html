@@ -79,11 +79,22 @@
         Object.fromEntries(lenses.map(l => [l.name, { aws: l.aws.score, azure: l.azure.score }]))
       );
 
+      const [weights, setWeights] = React.useState(() =>
+        Object.fromEntries(lenses.map(l => [l.name, l.weight]))
+      );
+
+      const setWeight = (name, val) => {
+        const n = Math.max(0, Math.min(100, +val || 0));
+        setWeights(p => ({ ...p, [name]: n }));
+      };
+
+      const totalW = Object.values(weights).reduce((s, w) => s + w, 0);
+
       const set = (name, provider, val) =>
         setScores(p => ({ ...p, [name]: { ...p[name], [provider]: val } }));
 
-      const awsW = lenses.reduce((s, l) => s + scores[l.name].aws * l.weight, 0) / totalWeight;
-      const azureW = lenses.reduce((s, l) => s + scores[l.name].azure * l.weight, 0) / totalWeight;
+      const awsW = totalW > 0 ? lenses.reduce((s, l) => s + scores[l.name].aws * weights[l.name], 0) / totalW : 0;
+      const azureW = totalW > 0 ? lenses.reduce((s, l) => s + scores[l.name].azure * weights[l.name], 0) / totalW : 0;
       const winner = awsW > azureW ? "AWS" : azureW > awsW ? "Azure" : "Tie";
       const margin = Math.abs(awsW - azureW).toFixed(2);
 
@@ -104,7 +115,7 @@
               { label: "AWS weighted score", val: `${awsW.toFixed(2)}/5`, sub: `${((awsW/5)*100).toFixed(1)}%`, bg: "#FFF3D6", text: "#B45309" },
               { label: "Azure weighted score", val: `${azureW.toFixed(2)}/5`, sub: `${((azureW/5)*100).toFixed(1)}%`, bg: "#DBEAFE", text: "#1D4ED8" },
               { label: "Recommendation", val: winner, sub: `margin ${margin} pts`, bg: winner === "AWS" ? "#FFF3D6" : winner === "Azure" ? "#DBEAFE" : "#f3f4f6", text: winner === "AWS" ? "#B45309" : "#1D4ED8" },
-              { label: "Total weight", val: `${totalWeight}%`, sub: "13 lenses", bg: "#f3f4f6", text: "#111827" },
+              { label: "Total weight", val: `${totalW}%`, sub: totalW !== 100 ? "⚠️ should sum to 100" : "13 lenses ✓", bg: totalW !== 100 ? "#fee2e2" : "#f3f4f6", text: totalW !== 100 ? "#991b1b" : "#111827" },
             ].map(c => (
               <div key={c.label} style={{ background: c.bg, borderRadius: 8, padding: "12px 16px", flex: 1, minWidth: 110 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: c.text, marginBottom: 4 }}>{c.label}</div>
@@ -144,7 +155,16 @@
                         {l.name}
                         {pending && <span style={{ marginLeft: 6, fontSize: 10, background: "#fcd34d", color: "#92400e", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>SPIKE</span>}
                       </td>
-                      <td style={{ padding: "8px 10px", fontWeight: 700, color: "#111827", whiteSpace: "nowrap" }}>{l.weight}%</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <input
+                            type="number" min="0" max="100" value={weights[l.name]}
+                            onChange={e => setWeight(l.name, e.target.value)}
+                            style={{ width: 44, padding: "2px 4px", border: "1px solid #d1d5db", borderRadius: 4, fontSize: 12, fontWeight: 700, textAlign: "center" }}
+                          />
+                          <span style={{ fontSize: 11, color: "#9ca3af" }}>%</span>
+                        </div>
+                      </td>
                       <td style={{ padding: "8px 10px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                           <span style={{ padding: "2px 8px", borderRadius: 10, background: pill(aws).bg, color: pill(aws).text, fontWeight: 700, fontSize: 12, minWidth: 24, textAlign: "center" }}>{aws}</span>
@@ -170,7 +190,7 @@
               <tfoot>
                 <tr style={{ background: "#111827", color: "#fff" }}>
                   <td colSpan={2} style={{ padding: "10px", fontWeight: 700, fontSize: 13 }}>Weighted total</td>
-                  <td style={{ padding: "10px", fontWeight: 700 }}>{totalWeight}%</td>
+                  <td style={{ padding: "10px", fontWeight: 700, color: totalW !== 100 ? "#fca5a5" : "#fff" }}>{totalW}%{totalW !== 100 ? " ⚠️" : ""}</td>
                   <td colSpan={2} style={{ padding: "10px" }}>
                     <span style={{ padding: "3px 10px", borderRadius: 10, background: "#FFF3D6", color: "#B45309", fontWeight: 800, fontSize: 13 }}>
                       AWS {awsW.toFixed(2)}/5 ({((awsW/5)*100).toFixed(1)}%)
